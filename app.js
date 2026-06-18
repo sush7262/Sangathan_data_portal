@@ -22,7 +22,8 @@ async function loadAppData(rec) {
 }
 
 /* ---- state ---- */
-let S={user:null,screen:'login',district:null,sectionIdx:0,ctx:'user'};
+const PUBLIC_USER = { email: 'public', role: 'Data Entry', vibhag: 'सोलन', districts: DNAMES };
+let S={user: PUBLIC_USER, screen:'na_landing', district:null, sectionIdx:0, ctx:'user'};
 
 /* ---- helpers ---- */
 const $=s=>document.querySelector(s);
@@ -43,31 +44,34 @@ let tT;function toast(m,k){const t=$('#toast');t.textContent=m;t.className='toas
 /* ---- top chrome ---- */
 function topbar(){
   const u=S.user;
+  const isAdmin = u && u.role === 'Admin';
   return `<div class="topbar">
     <div class="brand"><div class="logo dev">शि</div>
       <div><div class="t1">शिक्षा महाकुम्भ · संगठन डेटा पोर्टल</div>
       <div class="t2">SOLAN VIBHAG WORKBOOK</div></div></div>
     <div class="spacer"></div>
-    ${u?`<span class="pill ${u.role==='Admin'?'adm':'usr'}">${u.role==='Admin'?'ADMIN':'DATA ENTRY USER'}</span>
+    ${isAdmin ? `<span class="pill adm">ADMIN</span>
       <div class="userchip"><span class="em">${esc(u.email)}</span></div>
-      <button class="btn sm ghost" style="color:#E7CBA6;border-color:#3a4566" onclick="logout()">लॉगआउट</button>`:''}
+      <button class="btn sm ghost" style="color:#E7CBA6;border-color:#3a4566" onclick="logout()">लॉगआउट</button>`
+    : `<button class="btn sm ghost" style="color:#E7CBA6;border-color:#3a4566" onclick="S.screen='login';render()">Admin Login</button>`}
   </div>`;
 }
 async function logout(){
   await window.supabaseLogout();
-  S={user:null,screen:'login',district:null,sectionIdx:0,ctx:'user'};
+  S={user: PUBLIC_USER, screen:'na_landing', district:null, sectionIdx:0, ctx:'user'};
   render();
 }
 
 /* ================= LOGIN ================= */
 function loginScreen(){
   $('#app').innerHTML=`<div class="loginwrap"><div class="loginbox">
-    <div class="lh"><div class="t1">संगठन डेटा पोर्टल</div><div class="t2">portal.shikshamahakumbh.org · Login</div></div>
+    <div class="lh"><div class="t1">संगठन डेटा पोर्टल</div><div class="t2">Admin Portal Login</div></div>
     <div class="lb">
       <div class="field"><span>Email ID</span><input id="email" type="email" placeholder="approved.mail@example.org" autocomplete="off"></div>
       <button class="btn primary" style="width:100%" onclick="doLogin()">Send OTP / Continue</button>
       <div class="errline" id="lerr"></div>
-      <div class="note" style="margin-top:6px">सिस्टम Access Master में मेल आईडी जाँचता है और भूमिका अनुसार रूट करता है — Admin → Dashboard, अन्य → Data Entry।</div>
+      <div class="note" style="margin-top:6px">यह लॉगिन केवल एडमिन (Admin) उपयोग के लिए है।</div>
+      <button class="btn ghost" style="width:100%;margin-top:10px" onclick="S.screen='na_landing';render()">← Back to Portal</button>
     </div></div></div>`;
   const ip=$('#email'); ip.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 }
@@ -111,8 +115,8 @@ async function verifyOtp(email) {
   }
   
   const rec = await window.fetchAccessRecord(email);
-  if (!rec || rec.status !== 'Active') { 
-    $('#lerr').textContent = 'Access Master में आपकी ID नहीं है या Inactive है।'; 
+  if (!rec || rec.status !== 'Active' || rec.role !== 'Admin') { 
+    $('#lerr').textContent = 'केवल Admin उपयोग के लिए अनुमति है।'; 
     await window.supabaseLogout();
     return; 
   }
@@ -120,8 +124,8 @@ async function verifyOtp(email) {
   await loadAppData(rec);
   
   S.user = rec;
-  S.screen = rec.role === 'Admin' ? 'ad_dashboard' : 'na_landing';
-  S.ctx = rec.role === 'Admin' ? 'admin' : 'user';
+  S.screen = 'ad_dashboard';
+  S.ctx = 'admin';
   render();
 }
 
@@ -239,6 +243,7 @@ function naReview(){
     <div class="card pad" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <div style="flex:1"><div class="muted" style="font-size:13px">Overall</div>
         <div class="bar" style="max-width:320px"><i style="width:${districtPct(d)}%"></i></div></div>
+      ${S.user.email === 'public' ? `<div class="field" style="margin:0"><input id="submit_name" type="text" placeholder="आपका नाम (Your Name)" style="width:200px"></div>` : ''}
       <button class="btn" onclick="backToForm()">← Edit Data</button>
       <button class="btn green" onclick="saveDraft();toast('प्रारूप सेव हुआ','ok')">Save Draft</button>
       <button class="btn primary" onclick="finalSubmit()">Final Submit</button>
@@ -247,7 +252,17 @@ function naReview(){
 function backToForm(){S.screen='na_form';render();}
 async function finalSubmit(){
   const d=S.district,e=entry(d);
-  e.status='submitted';e.submittedBy=S.user.email;e.submittedAt=new Date().toISOString();
+  let submittedBy = S.user.email;
+  if (S.user.email === 'public') {
+    const nameInput = $('#submit_name');
+    if (nameInput && nameInput.value.trim() !== '') {
+      submittedBy = nameInput.value.trim();
+    } else {
+      toast('कृपया सबमिट करने से पहले अपना नाम दर्ज करें', 1);
+      return;
+    }
+  }
+  e.status='submitted';e.submittedBy=submittedBy;e.submittedAt=new Date().toISOString();
   await window.submitEntry(d, e.values, e.submittedBy);
   S.screen='na_ack';render();
 }
@@ -495,14 +510,16 @@ window.unlock=unlock;window.addAccess=addAccess;window.removeAccess=removeAccess
 window.downloadExcel=downloadExcel;window.exportCSV=exportCSV;window.downloadAck=downloadAck;
 window.printReport=printReport;window.S=S;window.DNAMES=DNAMES;window.render=render;
 async function init() {
+  await loadAppData({ role: 'Public' });
+  
   const { data: { session } } = await window.supabaseGetSession();
   if (session) {
     const rec = await window.fetchAccessRecord(session.user.email);
-    if (rec && rec.status === 'Active') {
+    if (rec && rec.status === 'Active' && rec.role === 'Admin') {
       await loadAppData(rec);
       S.user = rec;
-      S.screen = rec.role === 'Admin' ? 'ad_dashboard' : 'na_landing';
-      S.ctx = rec.role === 'Admin' ? 'admin' : 'user';
+      S.screen = 'ad_dashboard';
+      S.ctx = 'admin';
     }
   }
   render();
