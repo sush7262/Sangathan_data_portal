@@ -22,8 +22,8 @@ async function loadAppData(rec) {
 }
 
 /* ---- state ---- */
-const PUBLIC_USER = { email: 'public', role: 'Data Entry', vibhag: 'सोलन', districts: DNAMES };
-let S={user: PUBLIC_USER, screen:'na_landing', district:null, sectionIdx:0, ctx:'user'};
+const PUBLIC_USER = { email: 'public', role: 'Data Entry', vibhag: '', districts: [] };
+let S={user: PUBLIC_USER, screen:'landing', district:null, sectionIdx:0, ctx:'user'};
 
 /* ---- helpers ---- */
 const $=s=>document.querySelector(s);
@@ -48,19 +48,89 @@ function topbar(){
   return `<div class="topbar">
     <div class="brand"><div class="logo dev">शि</div>
       <div><div class="t1">शिक्षा महाकुम्भ · संगठन डेटा पोर्टल</div>
-      <div class="t2">SOLAN VIBHAG WORKBOOK</div></div></div>
+      ${S.screen === 'landing' ? '' : `<div class="t2">${u.vibhag ? u.vibhag.toUpperCase() : 'PORTAL'} WORKBOOK</div>`}</div></div>
     <div class="spacer"></div>
     ${isAdmin ? `<span class="pill adm">ADMIN</span>
       <div class="userchip"><span class="em">${esc(u.email)}</span></div>
       <button class="btn sm ghost" style="color:#E7CBA6;border-color:#3a4566" onclick="logout()">लॉगआउट</button>`
-    : `<button class="btn sm ghost" style="color:#E7CBA6;border-color:#3a4566" onclick="S.screen='login';render()">Admin Login</button>`}
+    : (S.screen === 'landing' ? '' : `<button class="btn sm ghost" style="color:#E7CBA6;border-color:#3a4566" onclick="S.screen='login';render()">Admin Login</button>`)}
   </div>`;
 }
 async function logout(){
   await window.supabaseLogout();
-  S={user: PUBLIC_USER, screen:'na_landing', district:null, sectionIdx:0, ctx:'user'};
+  S={user: PUBLIC_USER, screen:'landing', district:null, sectionIdx:0, ctx:'user'};
   render();
 }
+
+/* ================= HUB / LANDING ================= */
+function landingScreen(){
+  const vOpts = Object.entries(SANGATHAN_MAPPING).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
+  
+  $('#app').innerHTML=topbar()+`<div class="content" style="margin:0 auto;max-width:800px">
+    <div style="text-align:center;margin:40px 0 20px">
+      <h1 class="dev" style="font-size:32px;color:#1B2436">भौगोलिक रचना एवं कार्यस्थिति</h1>
+    </div>
+    <div class="card pad" style="max-width:600px;margin:0 auto">
+      <div style="color:#D9661C;font-size:14px;margin-bottom:12px">● पहले विभाग और जिला चुनें</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:200px">
+          <span>अपना विभाग चुनें</span>
+          <select id="sel_vibhag" onchange="updateDistDropdown()">
+            <option value="">विभाग चुनें</option>
+            ${vOpts}
+          </select>
+        </div>
+        <div class="field" style="flex:1;min-width:200px">
+          <span>फिर अपना जिला चुनें</span>
+          <select id="sel_district" disabled onchange="checkLandingBtn()">
+            <option value="">पहले विभाग चुनें</option>
+          </select>
+        </div>
+      </div>
+      <div style="background:#eaf2f8;color:#455a64;padding:12px;border-radius:6px;font-size:13px;margin:10px 0">
+        जिला सूची चयनित विभाग के अनुसार ड्रॉपडाउन में दिखाई देगी।
+      </div>
+      <div class="wrap-actions" style="margin-top:20px">
+        <button id="btn_start" class="btn primary" disabled onclick="startDataEntry()">डाटा एंट्री शुरू करें</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function updateDistDropdown() {
+  const vId = $('#sel_vibhag').value;
+  const dSel = $('#sel_district');
+  const btn = $('#btn_start');
+  if (!vId) {
+    dSel.innerHTML = '<option value="">पहले विभाग चुनें</option>';
+    dSel.disabled = true;
+    btn.disabled = true;
+    return;
+  }
+  const dists = SANGATHAN_MAPPING[vId].districts;
+  dSel.innerHTML = '<option value="">जिला चुनें</option>' + dists.map(d => `<option value="${d}">${d}</option>`).join('');
+  dSel.disabled = false;
+  checkLandingBtn();
+}
+
+function checkLandingBtn() {
+  const dName = $('#sel_district').value;
+  $('#btn_start').disabled = !dName;
+}
+
+function startDataEntry() {
+  const vId = $('#sel_vibhag').value;
+  const dName = $('#sel_district').value;
+  if (!vId || !dName) return;
+  const vObj = SANGATHAN_MAPPING[vId];
+  S.user.vibhag = vObj.name;
+  S.user.districts = vObj.districts;
+  S.district = dName;
+  S.sectionIdx = 0;
+  S.screen = 'na_form';
+  render();
+}
+window.updateDistDropdown=updateDistDropdown;window.checkLandingBtn=checkLandingBtn;window.startDataEntry=startDataEntry;
 
 /* ================= LOGIN ================= */
 function loginScreen(){
@@ -71,7 +141,7 @@ function loginScreen(){
       <button class="btn primary" style="width:100%" onclick="doLogin()">Send OTP / Continue</button>
       <div class="errline" id="lerr"></div>
       <div class="note" style="margin-top:6px">यह लॉगिन केवल एडमिन (Admin) उपयोग के लिए है।</div>
-      <button class="btn ghost" style="width:100%;margin-top:10px" onclick="S.screen='na_landing';render()">← Back to Portal</button>
+      <button class="btn ghost" style="width:100%;margin-top:10px" onclick="S.screen='landing';render()">← Back to Portal</button>
     </div></div></div>`;
   const ip=$('#email'); ip.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 }
@@ -93,12 +163,6 @@ async function doLogin(){
   const email=($('#email').value||'').trim().toLowerCase();
   if(!email){$('#lerr').textContent='Email ID दर्ज करें।';return;}
   $('#lerr').textContent='OTP भेजा जा रहा है...';
-  if (email === 'bhagwannakhate9923@gmail.com') {
-    console.log("Bypass OTP triggered: 123456");
-    alert("Bypass Mode! OTP is: 123456");
-    showOtpScreen(email);
-    return;
-  }
   const { error } = await window.supabaseLogin(email);
   if (error) { $('#lerr').textContent = error.message; return; }
   showOtpScreen(email);
@@ -109,10 +173,8 @@ async function verifyOtp(email) {
   if(!token){$('#lerr').textContent='OTP दर्ज करें।';return;}
   $('#lerr').textContent='Verify हो रहा है...';
   
-  if (!(email === 'bhagwannakhate9923@gmail.com' && token === '123456')) {
-    const { error } = await window.supabaseVerifyOtp(email, token);
-    if (error) { $('#lerr').textContent = 'OTP गलत है या expire हो गया है।'; return; }
-  }
+  const { error } = await window.supabaseVerifyOtp(email, token);
+  if (error) { $('#lerr').textContent = 'OTP गलत है या expire हो गया है।'; return; }
   
   const rec = await window.fetchAccessRecord(email);
   if (!rec || rec.status !== 'Active' || rec.role !== 'Admin') { 
@@ -136,30 +198,7 @@ function stepper(stage){ // stage: entry|review|submit
   return `<div class="stepper">${steps.map(([n,l,k],i)=>
     `<div class="step ${k===stage?'on':(i<cur?'done':'')}"><span class="n">${i<cur?'✓':n}</span>${l}</div>`).join('')}</div>`;
 }
-function naLanding(){
-  const u=S.user;
-  const rows=u.districts.map(d=>{
-    const st=dispStatus(d),pct=districtPct(d);
-    return `<tr><td class="dev" style="font-size:17px">${d}</td>
-      <td style="width:160px"><div class="bar"><i style="width:${pct}%"></i></div><div class="muted" style="font-size:12px;margin-top:3px">${pct}% भरा</div></td>
-      <td><span class="pill ${STCLASS[st]}">${STLABEL[st]}</span></td>
-      <td class="right"><button class="btn sm primary" onclick="openForm('${d}')">${st==='submitted'?'देखें':'फॉर्म खोलें'}</button></td></tr>`;
-  }).join('');
-  $('#app').innerHTML=topbar()+`<div class="content" style="margin:0 auto">
-    ${stepper('entry')}
-    <div class="page-h"><h1>Data Entry Portal</h1></div>
-    <div class="sub">यह non-admin उपयोगकर्ता का एकमात्र होम स्क्रीन है — कोई dashboard, report या admin मेनू नहीं।</div>
-    <div class="tiles">
-      <div class="tile acc"><div class="k">Assigned Vibhag</div><div class="v dev" style="font-size:24px">${u.vibhag}</div><div class="x">मेल आईडी से मैप्ड</div></div>
-      <div class="tile"><div class="k">Allowed Districts</div><div class="v">${u.districts.length}</div><div class="x">${u.districts.join(', ')}</div></div>
-      <div class="tile"><div class="k">Submitted</div><div class="v num">${u.districts.filter(d=>dispStatus(d)==='submitted').length}</div><div class="x">of ${u.districts.length}</div></div>
-    </div>
-    <div class="card pad">
-      <div class="eyebrow">Step 1–2 · Vibhag → District</div>
-      <table class="tbl"><thead><tr><th>District</th><th>Draft completion</th><th>Status</th><th class="right">Action</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-    </div></div>`;
-}
+
 function openForm(d){
   if(S.ctx==='user' && !S.user.districts.includes(d)){toast('यह जिला आपको आवंटित नहीं है',1);return;}
   S.district=d;S.sectionIdx=0;S.screen='na_form';render();
@@ -180,7 +219,8 @@ function naForm(){
     ${autos.map(c=>`<span class="ai">${esc(AUTO_LABELS[c]||c)}<b data-auto="${c}">${auto(d,c)}</b></span>`).join('')}</div></div>`:'';
   const back=S.ctx==='admin';
   $('#app').innerHTML=topbar()+`<div class="content" style="margin:0 auto">
-    ${back?`<button class="btn sm ghost" onclick="adminBack()">← Admin</button>`:stepper('entry')}
+    ${back?`<button class="btn sm ghost" onclick="adminBack()">← Admin</button>`:
+      (S.user.email==='public'?`<button class="btn sm ghost" onclick="S.screen='landing';render()" style="margin-bottom:15px">← Vibhag Workbook</button>${stepper('entry')}`:stepper('entry'))}
     <div class="page-h"><h1 class="dev">${esc(sec.title)}</h1></div>
     <div class="sub">जिला: <b class="dev">${d}</b> · विभाग: <b class="dev">${S.user.vibhag}</b> · Step ${S.sectionIdx+1} of ${SECTIONS.length}${locked?' · <span class="pill sub">Submitted — locked</span>':''}</div>
     <div class="stepper">${SECTIONS.map((s,i)=>`<div class="step ${i===S.sectionIdx?'on':(sectionPct(d,s)===100?'done':'')}" style="cursor:pointer" onclick="goSection(${i})"><span class="n">${sectionPct(d,s)===100&&i!==S.sectionIdx?'✓':i+1}</span>${s.short}</div>`).join('')}</div>
@@ -192,7 +232,7 @@ function naForm(){
         ${S.sectionIdx<SECTIONS.length-1
           ? `<button class="btn primary" onclick="nextSection()">अगला: ${SECTIONS[S.sectionIdx+1].short} →</button>`
           : `<button class="btn primary" onclick="gotoReview()">Review Form →</button>`}
-      </div></div></div>`;
+      </div></div>`;
   $('#app').querySelectorAll('input[data-col]').forEach(inp=>{
     inp.addEventListener('input',ev=>{
       const c=ev.target.dataset.col,v=ev.target.value;
@@ -285,7 +325,7 @@ function naAck(){
       <div class="wrap-actions" style="justify-content:center">
         <button class="btn" onclick="downloadAck('${d}')">Download Acknowledgement</button>
         <button class="btn" onclick="downloadExcel(['${d}'],'${d}_भरा.xlsx')">Download Excel</button>
-        <button class="btn primary" onclick="S.screen='na_landing';render()">Back to Portal</button>
+        <button class="btn primary" onclick="S.screen='landing';render()">Back to Portal</button>
       </div></div></div>`;
 }
 
@@ -343,7 +383,7 @@ function adEntries(){
     <div class="page-h"><h1>All Entries</h1></div>
     <div class="sub">सभी जिलों की प्रविष्टि स्थिति। Admin किसी भी फॉर्म को खोल/संपादित/अनलॉक कर सकते हैं।</div>
     <div class="card pad"><div class="flex" style="margin-bottom:12px"><div style="flex:1"></div>
-      <button class="btn primary" onclick="downloadExcel(DNAMES,'solan_vibhag_consolidated.xlsx')">Consolidated Excel export</button></div>
+      <button class="btn primary" onclick="downloadExcel(DNAMES,'vibhag_consolidated.xlsx')">Consolidated Excel export</button></div>
     <table class="tbl"><thead><tr><th>District</th><th>Status</th><th>Filled</th><th>Progress</th><th>Submitted by</th><th class="right">Actions</th></tr></thead>
     <tbody>${rows}</tbody></table></div>`);
 }
@@ -371,7 +411,7 @@ function adReports(){
       </div>
       <div class="card pad"><div class="eyebrow">Export options</div>
         <div class="wrap-actions" style="flex-direction:column;align-items:stretch">
-          <button class="btn" onclick="downloadExcel(DNAMES,'solan_vibhag_summary.xlsx')">Excel summary export</button>
+          <button class="btn" onclick="downloadExcel(DNAMES,'vibhag_summary.xlsx')">Excel summary export</button>
           <button class="btn" onclick="printReport('district')">District-wise PDF</button>
           <button class="btn" onclick="printReport('vibhag')">Vibhag consolidated PDF</button>
           <button class="btn" onclick="exportCSV()">Admin CSV backup</button>
@@ -395,7 +435,9 @@ async function adAccess(){
       <div class="card pad"><div class="eyebrow">Add / Edit access</div>
         <div class="field"><span>Mail ID</span><input id="acc_email" type="email" placeholder="person@example.org"></div>
         <div class="field"><span>Role</span><select id="acc_role"><option>Data Entry</option><option>Admin</option></select></div>
-        <div class="field"><span>Assigned Vibhag</span><select id="acc_vibhag"><option>सोलन</option></select></div>
+        <div class="field"><span>Assigned Vibhag</span><select id="acc_vibhag">
+          ${Object.values(SANGATHAN_MAPPING).map(v=>`<option>${v.name}</option>`).join('')}
+        </select></div>
         <div class="field"><span>Assigned Districts (Ctrl/Cmd for multiple)</span>
           <select id="acc_dist" multiple size="4">${DNAMES.map(d=>`<option>${d}</option>`).join('')}</select></div>
         <button class="btn primary" onclick="addAccess()">Save Access</button><div class="errline" id="aerr"></div>
@@ -451,7 +493,7 @@ function exportCSV(){
     SECTIONS.forEach(s=>s.cols.forEach(c=>{const v=e.values[c];if(v==null||v==='')return;
       rows.push([d.name,d.row,s.short,c,labelOf[c]||'',v]);}));});
   const csv=rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
-  dl(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),'solan_vibhag_backup.csv');
+  dl(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),'vibhag_backup.csv');
   toast('CSV backup तैयार','ok');
 }
 function downloadAck(d){
@@ -471,7 +513,8 @@ function downloadAck(d){
   dl(new Blob([html],{type:'text/html'}),`acknowledgement_${d}.html`);
 }
 function printReport(kind){
-  const title=kind==='vibhag'?'Vibhag Consolidated Report — सोलन':'District-wise Report — सोलन Vibhag';
+  const vibhagName = S.user && S.user.vibhag ? S.user.vibhag : 'All';
+  const title=kind==='vibhag'?`Vibhag Consolidated Report — ${vibhagName}`:`District-wise Report — ${vibhagName}`;
   let body=`<h2 style="border-bottom:3px solid #D9661C;padding-bottom:8px;font-family:sans-serif">${title}</h2>
     <p style="font-family:sans-serif;color:#555">Generated ${new Date().toLocaleString('en-IN')} · structure mirrors uploaded Excel headings.</p>`;
   body+=`<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:13px">
@@ -490,8 +533,8 @@ function dl(blob,name){const a=document.createElement('a');a.href=URL.createObje
 function render(){
   saveAll();
   switch(S.screen){
+    case'landing':return landingScreen();
     case'login':return loginScreen();
-    case'na_landing':return naLanding();
     case'na_form':return naForm();
     case'na_review':return naReview();
     case'na_ack':return naAck();

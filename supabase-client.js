@@ -29,9 +29,6 @@ export async function supabaseGetSession() {
 
 // --- Access Master Functions ---
 export async function fetchAccessRecord(email) {
-  if (email === 'bhagwannakhate9923@gmail.com') {
-    return { email: 'bhagwannakhate9923@gmail.com', role: 'Admin', vibhag: 'सोलन', districts: ['सोलन', 'नालागढ़', 'हरिपुरधार', 'सिरमौर'], status: 'Active' };
-  }
   const { data, error } = await supabase.from('access_master').select('*').eq('email', email).single();
   if (error && error.code !== 'PGRST116') console.error('fetchAccessRecord error:', error);
   return data;
