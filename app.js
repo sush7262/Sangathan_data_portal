@@ -184,9 +184,14 @@ function naForm(){
   const locked = e.status==='submitted' && S.ctx!=='admin';
   const groups=sec.groups.map(g=>{
     const fields=g.fields.map(f=>{
-      const v=e.values[f.col]??'';
-      return `<div class="fld"><label title="${esc(f.label)}">${esc(f.label)}</label>
-        <input class="num ${v!==''?'filled':''}" inputmode="numeric" data-col="${f.col}" value="${esc(v)}" ${locked?'disabled':''}></div>`;
+      const isAuto = typeof AUTO !== 'undefined' && AUTO[f.col] !== undefined;
+      let v = isAuto ? auto(d, f.col) : (e.values[f.col]??'');
+      if (isAuto && v === 0) v = '';
+      const bg = f.badge === 'AUTO' ? '#2A7D5C' : '#D9661C';
+      const badgeHtml = f.badge ? `<span class="pill" style="position:absolute;top:-20px;left:0;background:${bg};color:white;font-size:10px;padding:2px 6px;border-radius:10px;display:inline-block;line-height:1;z-index:2">${esc(f.badge)}</span>` : '';
+      const inpBg = f.badge === 'AUTO' ? 'background:#E8F5E9;border-color:#81C784;color:#1e7b55' : (f.badge === 'ADD' ? 'background:#FFF5E6;border-color:#F1B47B;color:#D9661C' : '');
+      return `<div class="fld" style="position:relative"><label title="${esc(f.label)}">${badgeHtml}${esc(f.label)}</label>
+        <input class="num ${v!==''?'filled':''}" style="${inpBg}" inputmode="numeric" data-col="${f.col}" value="${esc(v)}" ${(locked||isAuto)?'disabled':''} ${isAuto?`data-auto-inp="${f.col}"`:''}></div>`;
     }).join('');
     return `<div class="group"><div class="eyebrow">${esc(g.group)}</div><div class="fgrid">${fields}</div></div>`;
   }).join('');
@@ -212,6 +217,7 @@ function naForm(){
   $('#app').querySelectorAll('input[data-col]').forEach(inp=>{
     ['input', 'change', 'keyup'].forEach(evt => {
       inp.addEventListener(evt, ev=>{
+        if (inp.hasAttribute('data-auto-inp')) return;
         const c=ev.target.dataset.col,v=ev.target.value;
         e.values[c]=v; ev.target.classList.toggle('filled',v!=='');
         const ar=$('#autorow'); 
@@ -220,6 +226,14 @@ function naForm(){
             b.innerText = auto(d, b.dataset.auto);
           });
         }
+        $('#app').querySelectorAll('input[data-auto-inp]').forEach(ainp=>{
+          const ac = ainp.dataset.autoInp;
+          let av = auto(d, ac);
+          if (av === 0) av = '';
+          ainp.value = av;
+          e.values[ac] = av;
+          ainp.classList.toggle('filled', av !== '');
+        });
       });
     });
   });
