@@ -87,10 +87,10 @@ table.tbl tr:hover td{background:var(--paper2)}
 /* forms */
 .group{padding:16px 0;border-top:1px dashed var(--line)}
 .group:first-child{border-top:0}
-.eyebrow{font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--saffron-d);margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.eyebrow{font-size:18px;font-weight:700;color:var(--saffron-d);margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--saffron)}
 .fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px 13px}
-.fld label{display:block;font-size:12.5px;color:var(--ink2);margin-bottom:4px;line-height:1.25;min-height:2.1em}
+.fld label{display:block;font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1.3;min-height:2.1em}
 .fld input{width:100%;font-family:'IBM Plex Mono';font-size:15px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:9px 10px;outline:none;text-align:right;transition:.12s}
 .fld input:hover{border-color:#D8C8A6}
 .fld input:focus{border-color:var(--saffron);background:#fff;box-shadow:0 0 0 3px var(--saffron-soft)}
