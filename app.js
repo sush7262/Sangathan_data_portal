@@ -162,6 +162,16 @@ function showOtpScreen(email) {
 async function doLogin(){
   const email=($('#email').value||'').trim().toLowerCase();
   if(!email){$('#lerr').textContent='Email ID दर्ज करें।';return;}
+  
+  $('#lerr').style.color = '';
+  $('#lerr').textContent='Checking access...';
+  const rec = await window.fetchAccessRecord(email);
+  if (!rec || rec.status !== 'Active' || rec.role !== 'Admin') {
+    $('#lerr').style.color = 'red';
+    $('#lerr').textContent = 'Unauthorized Email: Aap Admin nahi hain!';
+    return;
+  }
+
   $('#lerr').textContent='OTP भेजा जा रहा है...';
   const { error } = await window.supabaseLogin(email);
   if (error) { $('#lerr').textContent = error.message; return; }
