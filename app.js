@@ -28,9 +28,9 @@ let S={user: PUBLIC_USER, screen:'landing', district:null, sectionIdx:0, ctx:'us
 /* ---- helpers ---- */
 const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const numv=v=>{const n=parseFloat(v);return isFinite(n)?n:0;};
-const val=(d,c)=>numv(entry(d).values[c]);
-const auto=(d,c)=>(AUTO[c]||[]).reduce((s,x)=>s+val(d,x),0);
+const numv = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
+const val = (d,c) => numv(entry(d).values[c]);
+const auto = (d,c) => { const arr = (typeof AUTO !== 'undefined' ? AUTO[c] : []) || []; return arr.reduce((s,x) => s + val(d,x), 0); };
 function sectionFilled(d,sec){return sec.cols.filter(c=>{const v=entry(d).values[c];return v!=null&&v!=='';}).length;}
 function sectionPct(d,sec){return Math.round(100*sectionFilled(d,sec)/sec.cols.length);}
 function districtFilled(d){return ALLCOLS.filter(c=>{const v=entry(d).values[c];return v!=null&&v!=='';}).length;}
@@ -210,10 +210,17 @@ function naForm(){
           : `<button class="btn primary" onclick="gotoReview()">Review Form →</button>`}
       </div></div>`;
   $('#app').querySelectorAll('input[data-col]').forEach(inp=>{
-    inp.addEventListener('input',ev=>{
-      const c=ev.target.dataset.col,v=ev.target.value;
-      e.values[c]=v; ev.target.classList.toggle('filled',v!=='');
-      const ar=$('#autorow'); if(ar) ar.querySelectorAll('[data-auto]').forEach(b=>b.textContent=auto(d,b.dataset.auto));
+    ['input', 'change', 'keyup'].forEach(evt => {
+      inp.addEventListener(evt, ev=>{
+        const c=ev.target.dataset.col,v=ev.target.value;
+        e.values[c]=v; ev.target.classList.toggle('filled',v!=='');
+        const ar=$('#autorow'); 
+        if(ar) {
+          ar.querySelectorAll('[data-auto]').forEach(b=>{
+            b.innerText = auto(d, b.dataset.auto);
+          });
+        }
+      });
     });
   });
 }
