@@ -5,18 +5,11 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// --- Auth Functions ---
-export async function supabaseLogin(email) {
-  return await supabase.auth.signInWithOtp({
+export async function supabaseLoginWithPassword(email, password) {
+  return await supabase.auth.signInWithPassword({
     email,
-    options: {
-      shouldCreateUser: true
-    }
+    password
   });
-}
-
-export async function supabaseVerifyOtp(email, token) {
-  return await supabase.auth.verifyOtp({ email, token, type: 'email' });
 }
 
 export async function supabaseLogout() {
@@ -84,8 +77,7 @@ export async function unlockEntry(district) {
 
 // Expose to window fallback just in case
 window.supabase = supabase;
-window.supabaseLogin = supabaseLogin;
-window.supabaseVerifyOtp = supabaseVerifyOtp;
+window.supabaseLoginWithPassword = supabaseLoginWithPassword;
 window.supabaseLogout = supabaseLogout;
 window.supabaseGetSession = supabaseGetSession;
 window.fetchAccessRecord = fetchAccessRecord;

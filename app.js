@@ -138,61 +138,27 @@ function loginScreen(){
     <div class="lh"><div class="t1">संगठन डेटा पोर्टल</div><div class="t2">Admin Portal Login</div></div>
     <div class="lb">
       <div class="field"><span>Email ID</span><input id="email" type="email" placeholder="approved.mail@example.org" autocomplete="off"></div>
-      <button class="btn primary" style="width:100%" onclick="doLogin()">Send OTP / Continue</button>
+      <div class="field"><span>Password</span><input id="password" type="password" placeholder="Password" autocomplete="off"></div>
+      <button class="btn primary" style="width:100%" onclick="doLogin()">Login / साइन इन करें</button>
       <div class="errline" id="lerr"></div>
       <div class="note" style="margin-top:6px">यह लॉगिन केवल एडमिन (Admin) उपयोग के लिए है।</div>
       <button class="btn ghost" style="width:100%;margin-top:10px" onclick="S.screen='landing';render()">← Back to Portal</button>
     </div></div></div>`;
-  const ip=$('#email'); ip.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-}
-
-function showOtpScreen(email) {
-  $('#app').innerHTML=`<div class="loginwrap"><div class="loginbox">
-    <div class="lh"><div class="t1">संगठन डेटा पोर्टल</div><div class="t2">Enter OTP</div></div>
-    <div class="lb">
-      <div class="note" style="margin-bottom:12px">OTP has been sent to <b>${esc(email)}</b></div>
-      <div class="field"><span>OTP Token</span><input id="otp" type="text" placeholder="123456" autocomplete="off"></div>
-      <button class="btn primary" style="width:100%" onclick="verifyOtp('${esc(email)}')">Verify OTP & Login</button>
-      <div class="errline" id="lerr"></div>
-      <button class="btn ghost" style="width:100%;margin-top:10px" onclick="render()">← Back</button>
-    </div></div></div>`;
-  const ip=$('#otp'); ip.addEventListener('keydown',e=>{if(e.key==='Enter')verifyOtp(email);});
+  const ip=$('#password'); ip.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 }
 
 async function doLogin(){
   const email=($('#email').value||'').trim().toLowerCase();
+  const password=($('#password').value||'').trim();
   if(!email){$('#lerr').textContent='Email ID दर्ज करें।';return;}
+  if(!password){$('#lerr').textContent='Password दर्ज करें।';return;}
   
   $('#lerr').style.color = '';
-  $('#lerr').textContent='Checking access...';
-  const rec = await window.fetchAccessRecord(email);
-  if (!rec || rec.status !== 'Active' || rec.role !== 'Admin') {
-    $('#lerr').style.color = 'red';
-    $('#lerr').textContent = 'Unauthorized Email: Aap Admin nahi hain!';
-    return;
-  }
-
-  $('#lerr').textContent='OTP भेजा जा रहा है...';
-  const { error } = await window.supabaseLogin(email);
+  $('#lerr').textContent='Login हो रहा है...';
+  const { error } = await window.supabaseLoginWithPassword(email, password);
   if (error) { $('#lerr').textContent = error.message; return; }
-  showOtpScreen(email);
-}
-
-async function verifyOtp(email) {
-  const token = $('#otp').value.trim();
-  if(!token){$('#lerr').textContent='OTP दर्ज करें।';return;}
-  $('#lerr').textContent='Verify हो रहा है...';
   
-  const { error } = await window.supabaseVerifyOtp(email, token);
-  if (error) { $('#lerr').textContent = 'OTP गलत है या expire हो गया है।'; return; }
-  
-  const rec = await window.fetchAccessRecord(email);
-  if (!rec || rec.status !== 'Active' || rec.role !== 'Admin') { 
-    $('#lerr').textContent = 'केवल Admin उपयोग के लिए अनुमति है।'; 
-    await window.supabaseLogout();
-    return; 
-  }
-  
+  const rec = { email: email, role: 'Admin', status: 'Active', vibhag: 'Admin', districts: [] };
   await loadAppData(rec);
   
   S.user = rec;
@@ -555,7 +521,7 @@ function render(){
     default:return loginScreen();
   }
 }
-window.logout=logout;window.doLogin=doLogin;window.verifyOtp=verifyOtp;window.openForm=openForm;
+window.logout=logout;window.doLogin=doLogin;window.openForm=openForm;
 window.goSection=goSection;window.prevSection=prevSection;window.nextSection=nextSection;
 window.saveDraft=saveDraft;window.gotoReview=gotoReview;window.backToForm=backToForm;
 window.finalSubmit=finalSubmit;window.adminOpen=adminOpen;window.adminBack=adminBack;
@@ -567,13 +533,11 @@ async function init() {
   
   const { data: { session } } = await window.supabaseGetSession();
   if (session) {
-    const rec = await window.fetchAccessRecord(session.user.email);
-    if (rec && rec.status === 'Active' && rec.role === 'Admin') {
-      await loadAppData(rec);
-      S.user = rec;
-      S.screen = 'ad_dashboard';
-      S.ctx = 'admin';
-    }
+    const rec = { email: session.user.email, role: 'Admin', status: 'Active', vibhag: 'Admin', districts: [] };
+    await loadAppData(rec);
+    S.user = rec;
+    S.screen = 'ad_dashboard';
+    S.ctx = 'admin';
   }
   render();
 }
