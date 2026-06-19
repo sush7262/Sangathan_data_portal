@@ -23,9 +23,11 @@ async function loadAppData(rec) {
 
 /* ---- state ---- */
 const PUBLIC_USER = { email: 'public', role: 'Data Entry', vibhag: '', districts: [] };
-let S = { user: PUBLIC_USER, screen: 'landing', district: null, sectionIdx: 0, ctx: 'user' };
+let S = { user: PUBLIC_USER, screen: 'landing', district: null, sectionIdx: 0, ctx: 'user', adminVibhag: 'all' };
+window.setAdminVibhag = (v) => { S.adminVibhag = v; render(); };
 
 /* ---- helpers ---- */
+const getAdminDistricts = () => (S.adminVibhag === 'all' || !SANGATHAN_MAPPING[S.adminVibhag]) ? DNAMES : SANGATHAN_MAPPING[S.adminVibhag].districts;
 const $ = s => document.querySelector(s);
 const esc = s => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const numv = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
@@ -337,15 +339,16 @@ function adminLayout(active, content) {
     </aside><div class="content">${content}</div></div>`;
 }
 function adDashboard() {
-  const sub = DNAMES.filter(d => dispStatus(d) === 'submitted').length;
-  const dr = DNAMES.filter(d => dispStatus(d) === 'draft').length;
-  const pend = DNAMES.filter(d => dispStatus(d) === 'pending').length;
-  const attn = DNAMES.filter(d => dispStatus(d) !== 'submitted').map(d => {
+  const adminDists = getAdminDistricts();
+  const sub = adminDists.filter(d => dispStatus(d) === 'submitted').length;
+  const dr = adminDists.filter(d => dispStatus(d) === 'draft').length;
+  const pend = adminDists.filter(d => dispStatus(d) === 'pending').length;
+  const attn = adminDists.filter(d => dispStatus(d) !== 'submitted').map(d => {
     const st = dispStatus(d); let issue = st === 'pending' ? 'Not started' : (districtPct(d) < 60 ? 'Sections incomplete' : 'Draft — needs submit');
     return `<tr><td class="dev" style="font-size:16px">${d}</td><td>${issue}</td>
       <td class="right"><button class="btn sm" onclick="adminOpen('${d}')">Open</button></td></tr>`;
   }).join('') || '<tr><td colspan="3" class="muted">सभी जिले सबमिट हो चुके हैं ✓</td></tr>';
-  const overview = DNAMES.map(d => {
+  const overview = adminDists.map(d => {
     const p = districtPct(d), st = dispStatus(d);
     return `<div class="dcard"><div class="dh"><div class="ring" style="--p:${p}"><span>${p}%</span></div>
       <div style="flex:1"><div class="nm">${d}</div><span class="pill ${STCLASS[st]}">${STLABEL[st]}</span></div></div>
@@ -353,11 +356,16 @@ function adDashboard() {
       <div class="flex"><span class="muted" style="font-size:12px;flex:1">${districtFilled(d)}/${ALLCOLS.length} fields</span>
         <button class="btn sm" onclick="adminOpen('${d}')">View / Edit</button></div></div>`;
   }).join('');
+  const vOptions = `<option value="all" ${S.adminVibhag==='all'?'selected':''}>All Vibhags</option>` + 
+    Object.entries(SANGATHAN_MAPPING).map(([k,v]) => `<option value="${k}" ${S.adminVibhag===k?'selected':''}>${v.name}</option>`).join('');
+  
   adminLayout('ad_dashboard', `
-    <div class="page-h"><h1>Admin Dashboard</h1><span class="pill adm">Solan Vibhag</span></div>
+    <div class="page-h"><h1>Admin Dashboard</h1>
+      <select onchange="setAdminVibhag(this.value)" style="margin-left:15px;padding:4px 8px;font-size:14px;border-radius:4px">${vOptions}</select>
+    </div>
     <div class="sub">सभी आवंटित जिलों की प्रगति व अधूरी प्रविष्टियाँ — केवल Admin को दृश्य।</div>
     <div class="tiles">
-      <div class="tile acc"><div class="k">Total Districts</div><div class="v num">${DNAMES.length}</div><div class="x">Solan Vibhag</div></div>
+      <div class="tile acc"><div class="k">Total Districts</div><div class="v num">${adminDists.length}</div><div class="x">${S.adminVibhag==='all'?'All Vibhags':SANGATHAN_MAPPING[S.adminVibhag].name}</div></div>
       <div class="tile"><div class="k">Submitted</div><div class="v num" style="color:var(--green)">${sub}</div><div class="x">finalised</div></div>
       <div class="tile"><div class="k">Draft</div><div class="v num" style="color:var(--amber)">${dr}</div><div class="x">need follow-up</div></div>
       <div class="tile"><div class="k">Pending</div><div class="v num" style="color:var(--ink3)">${pend}</div><div class="x">not started</div></div>
@@ -370,7 +378,8 @@ function adDashboard() {
 }
 function adminOpen(d) { S.district = d; S.sectionIdx = 0; S.ctx = 'admin'; S.screen = 'na_form'; render(); }
 function adEntries() {
-  const rows = DNAMES.map(d => {
+  const adminDists = getAdminDistricts();
+  const rows = adminDists.map(d => {
     const e = ENTRIES[d], st = dispStatus(d);
     return `<tr><td class="dev" style="font-size:16px">${d}</td>
       <td><span class="pill ${STCLASS[st]}">${STLABEL[st]}</span></td>
@@ -383,11 +392,20 @@ function adEntries() {
         <button class="btn sm" onclick="downloadExcel(['${d}'],'${d}_भरा.xlsx')">Excel</button>
       </td></tr>`;
   }).join('');
+  const vOptions = `<option value="all" ${S.adminVibhag==='all'?'selected':''}>All Vibhags</option>` + 
+    Object.entries(SANGATHAN_MAPPING).map(([k,v]) => `<option value="${k}" ${S.adminVibhag===k?'selected':''}>${v.name}</option>`).join('');
+  const filename = S.adminVibhag === 'all' ? 'all_vibhags_data.xlsx' : `${S.adminVibhag}_vibhag_data.xlsx`;
+  const exportBtn = S.adminVibhag === 'all' ? 
+    `<button class="btn primary" onclick="alert('Please select a specific Vibhag from the dropdown to download its Excel sheet.')">Consolidated Excel export</button>` :
+    `<button class="btn primary" onclick="downloadExcel(getAdminDistricts(), '${filename}')">Download ${SANGATHAN_MAPPING[S.adminVibhag].name} Excel</button>`;
+  
   adminLayout('ad_entries', `
-    <div class="page-h"><h1>All Entries</h1></div>
+    <div class="page-h"><h1>All Entries</h1>
+      <select onchange="setAdminVibhag(this.value)" style="margin-left:15px;padding:4px 8px;font-size:14px;border-radius:4px">${vOptions}</select>
+    </div>
     <div class="sub">सभी जिलों की प्रविष्टि स्थिति। Admin किसी भी फॉर्म को खोल/संपादित/अनलॉक कर सकते हैं।</div>
     <div class="card pad"><div class="flex" style="margin-bottom:12px"><div style="flex:1"></div>
-      <button class="btn primary" onclick="downloadExcel(DNAMES,'vibhag_consolidated.xlsx')">Consolidated Excel export</button></div>
+      ${exportBtn}</div>
     <table class="tbl"><thead><tr><th>District</th><th>Status</th><th>Filled</th><th>Progress</th><th>Submitted by</th><th class="right">Actions</th></tr></thead>
     <tbody>${rows}</tbody></table></div>`);
 }
@@ -482,13 +500,89 @@ async function downloadExcel(dists, filename) {
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load(b64ToBuf(DATA.b64));
     const ws = wb.getWorksheet(SHEET) || wb.worksheets[0];
     let written = 0;
+
+    if (!dists || dists.length === 0) throw new Error("No districts to export");
+
+    let vNameShort = "";
+    if (dists.length === DNAMES.length) {
+      vNameShort = "प्रान्त";
+    } else {
+      let activeVibhagName = "";
+      Object.entries(SANGATHAN_MAPPING).forEach(([k, v]) => {
+        if (v.districts.includes(dists[0])) activeVibhagName = v.name;
+      });
+      vNameShort = activeVibhagName.replace(' विभाग', '').trim();
+    }
+
+    const templateRowStyles = {};
+    const templateRowFormulas = {};
+    ws.getRow(9).eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      templateRowStyles[colNumber] = cell.style;
+      if (cell.formula) templateRowFormulas[colNumber] = cell.formula;
+    });
+
+    const vibhagTotals = {};
+    let currentRow = 9;
+
     dists.forEach(name => {
-      const d = DISTRICTS.find(x => x.name === name); if (!d) return; const e = ENTRIES[name]; if (!e) return;
+      const e = ENTRIES[name]; if (!e) return;
+      const row = ws.getRow(currentRow);
+
+      if (currentRow > 12) {
+        // New row: Needs styles and formulas injected manually
+        for (let c = 1; c <= 150; c++) {
+          const cell = row.getCell(c);
+          if (templateRowStyles[c]) cell.style = templateRowStyles[c];
+          if (templateRowFormulas[c]) {
+            cell.value = { formula: templateRowFormulas[c].replace(/\b([A-Z]+)9\b/g, `$1${currentRow}`) };
+          }
+        }
+      } else {
+        // Existing template row (9-12): Do NOT touch formulas, otherwise ExcelJS corrupts Shared Formulas!
+        // Just clear data cells.
+        ALLCOLS.forEach(col => { row.getCell(col).value = null; });
+      }
+
       ALLCOLS.forEach(col => {
         const raw = e.values[col]; if (raw == null || raw === '') return;
-        const n = Number(raw); ws.getCell(col + d.row).value = isFinite(n) ? n : raw; written++;
+        const n = Number(raw); 
+        row.getCell(col).value = isFinite(n) ? n : raw; 
+        written++;
+        if (isFinite(n)) {
+          vibhagTotals[col] = (vibhagTotals[col] || 0) + n;
+        }
       });
+
+      row.getCell('A').value = currentRow - 8;
+      row.getCell('B').value = vNameShort;
+      row.getCell('C').value = name;
+      currentRow++;
     });
+
+    // Clear any leftover template rows (up to 15 just to be safe)
+    for (let r = currentRow; r <= 15; r++) {
+      const row = ws.getRow(r);
+      row.getCell('A').value = null;
+      row.getCell('B').value = null;
+      row.getCell('C').value = null;
+      ALLCOLS.forEach(col => {
+        row.getCell(col).value = null;
+      });
+    }
+
+    const r8 = ws.getRow(8);
+    const r7 = ws.getRow(7);
+    r8.getCell('B').value = vNameShort;
+    r8.getCell('C').value = dists.length;
+    r7.getCell('C').value = dists.length;
+
+    ALLCOLS.forEach(col => {
+      if (vibhagTotals[col] !== undefined) {
+        if (!r8.getCell(col).formula) r8.getCell(col).value = vibhagTotals[col];
+        if (!r7.getCell(col).formula) r7.getCell(col).value = vibhagTotals[col];
+      }
+    });
+
     try { wb.calcProperties.fullCalcOnLoad = true; } catch (_) { }
     const out = await wb.xlsx.writeBuffer();
     dl(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
