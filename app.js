@@ -308,7 +308,7 @@ function naAck(){
       <div class="wrap-actions" style="justify-content:center">
         <button class="btn" onclick="downloadAck('${d}')">Download Acknowledgement</button>
         <button class="btn" onclick="downloadExcel(['${d}'],'${d}_भरा.xlsx')">Download Excel</button>
-        <button class="btn primary" onclick="S.screen='landing';render()">Back to Portal</button>
+        <button class="btn primary" onclick="S.screen=S.user.role==='Admin'?'ad_dashboard':'landing';render()">Back to ${S.user.role==='Admin'?'Dashboard':'Portal'}</button>
       </div></div></div>`;
 }
 
