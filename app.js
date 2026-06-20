@@ -395,9 +395,7 @@ function adEntries() {
   const vOptions = `<option value="all" ${S.adminVibhag==='all'?'selected':''}>All Vibhags</option>` + 
     Object.entries(SANGATHAN_MAPPING).map(([k,v]) => `<option value="${k}" ${S.adminVibhag===k?'selected':''}>${v.name}</option>`).join('');
   const filename = S.adminVibhag === 'all' ? 'all_vibhags_data.xlsx' : `${S.adminVibhag}_vibhag_data.xlsx`;
-  const exportBtn = S.adminVibhag === 'all' ? 
-    `<button class="btn primary" onclick="alert('Please select a specific Vibhag from the dropdown to download its Excel sheet.')">Consolidated Excel export</button>` :
-    `<button class="btn primary" onclick="downloadExcel(getAdminDistricts(), '${filename}')">Download ${SANGATHAN_MAPPING[S.adminVibhag].name} Excel</button>`;
+  const exportBtn = `<button class="btn primary" onclick="downloadExcel(getAdminDistricts(), '${filename}')">${S.adminVibhag === 'all' ? 'Consolidated Excel export' : `Download ${SANGATHAN_MAPPING[S.adminVibhag].name} Excel`}</button>`;
   
   adminLayout('ad_entries', `
     <div class="page-h"><h1>All Entries</h1>
@@ -521,48 +519,95 @@ async function downloadExcel(dists, filename) {
       if (cell.formula) templateRowFormulas[colNumber] = cell.formula;
     });
 
+    // Unmerge default template cells to prevent overlap
+    try {
+      ws.unMergeCells('B8:B12');
+      ws.unMergeCells('V8:V12');
+      ws.unMergeCells('CK8:CK12');
+      ws.unMergeCells('DH8:DH12');
+      ws.getRow(8).height = 18; // Fix squished row 8 after unmerge
+
+      // Hide महानगर columns and rename अन्य नगर
+      ws.getColumn('AP').hidden = true;
+      ws.getColumn('AQ').hidden = true;
+      ws.getColumn('AR').hidden = true;
+      ws.getCell('AS4').value = 'नगर';
+      ws.getCell('AT4').value = 'नगर';
+      ws.getCell('AU4').value = 'नगर';
+    } catch(e) { console.warn("Unmerge error", e); }
+
     const vibhagTotals = {};
     let currentRow = 9;
+    let currentKramank = 1;
 
-    dists.forEach(name => {
-      const e = ENTRIES[name]; if (!e) return;
-      const row = ws.getRow(currentRow);
-
-      if (currentRow > 12) {
-        // New row: Needs styles and formulas injected manually
-        for (let c = 1; c <= 150; c++) {
-          const cell = row.getCell(c);
-          if (templateRowStyles[c]) cell.style = templateRowStyles[c];
-          if (templateRowFormulas[c]) {
-            cell.value = { formula: templateRowFormulas[c].replace(/\b([A-Z]+)9\b/g, `$1${currentRow}`) };
-          }
-        }
-      } else {
-        // Existing template row (9-12): Do NOT touch formulas, otherwise ExcelJS corrupts Shared Formulas!
-        // Just clear data cells.
-        ALLCOLS.forEach(col => { row.getCell(col).value = null; });
+    // Group districts by Vibhag
+    const groups = [];
+    Object.values(SANGATHAN_MAPPING).forEach(vObj => {
+      const vDists = vObj.districts.filter(d => dists.includes(d));
+      if (vDists.length > 0) {
+        groups.push({ name: vObj.name, districts: vDists });
       }
+    });
 
-      ALLCOLS.forEach(col => {
-        const raw = e.values[col]; if (raw == null || raw === '') return;
-        const n = Number(raw); 
-        row.getCell(col).value = isFinite(n) ? n : raw; 
-        written++;
-        if (isFinite(n)) {
-          vibhagTotals[col] = (vibhagTotals[col] || 0) + n;
+    groups.forEach(group => {
+      const startRow = currentRow;
+      const vNameShortLocal = group.name.replace(' विभाग', '').trim();
+
+      group.districts.forEach(name => {
+        const e = ENTRIES[name]; if (!e) return;
+        const row = ws.getRow(currentRow);
+
+        if (currentRow > 12) {
+          // New row: Needs styles and formulas injected manually
+          for (let c = 1; c <= 150; c++) {
+            const cell = row.getCell(c);
+            if (templateRowStyles[c]) cell.style = templateRowStyles[c];
+            if (templateRowFormulas[c]) {
+              cell.value = { formula: templateRowFormulas[c].replace(/\b([A-Z]+)9\b/g, `$1${currentRow}`) };
+            }
+          }
+        } else {
+          // Existing template row (9-12): Do NOT touch formulas, otherwise ExcelJS corrupts Shared Formulas!
+          // Just clear data cells.
+          ALLCOLS.forEach(col => { row.getCell(col).value = null; });
         }
-      });
 
-      row.getCell('A').value = currentRow - 8;
-      row.getCell('B').value = vNameShort;
-      row.getCell('C').value = name;
-      row.getCell('V').value = vNameShort;
-      row.getCell('W').value = name;
-      row.getCell('CK').value = vNameShort;
-      row.getCell('CL').value = name;
-      row.getCell('DH').value = vNameShort;
-      row.getCell('DI').value = name;
-      currentRow++;
+        ALLCOLS.forEach(col => {
+          const raw = e.values[col]; if (raw == null || raw === '') return;
+          const n = Number(raw); 
+          row.getCell(col).value = isFinite(n) ? n : raw; 
+          written++;
+          if (isFinite(n)) {
+            vibhagTotals[col] = (vibhagTotals[col] || 0) + n;
+          }
+        });
+
+        row.getCell('A').value = currentKramank;
+        row.getCell('B').value = vNameShortLocal;
+        row.getCell('C').value = name;
+        row.getCell('V').value = vNameShortLocal;
+        row.getCell('W').value = name;
+        row.getCell('CK').value = vNameShortLocal;
+        row.getCell('CL').value = name;
+        row.getCell('DH').value = vNameShortLocal;
+        row.getCell('DI').value = name;
+        currentRow++;
+      });
+      
+      const endRow = currentRow - 1;
+      if (endRow >= startRow) {
+        // Merge cells for this vibhag
+        try {
+          if (endRow > startRow) {
+            ws.mergeCells(`A${startRow}:A${endRow}`);
+            ws.mergeCells(`B${startRow}:B${endRow}`);
+            ws.mergeCells(`V${startRow}:V${endRow}`);
+            ws.mergeCells(`CK${startRow}:CK${endRow}`);
+            ws.mergeCells(`DH${startRow}:DH${endRow}`);
+          }
+        } catch(e) { console.warn("Merge error", e); }
+      }
+      currentKramank++;
     });
 
     // Clear any leftover template rows (up to 15 just to be safe)
@@ -571,8 +616,11 @@ async function downloadExcel(dists, filename) {
       row.getCell('A').value = null;
       row.getCell('B').value = null;
       row.getCell('C').value = null;
+      row.getCell('V').value = null;
       row.getCell('W').value = null;
+      row.getCell('CK').value = null;
       row.getCell('CL').value = null;
+      row.getCell('DH').value = null;
       row.getCell('DI').value = null;
       ALLCOLS.forEach(col => {
         row.getCell(col).value = null;
@@ -674,6 +722,7 @@ window.finalSubmit = finalSubmit; window.adminOpen = adminOpen; window.adminBack
 window.unlock = unlock; window.addAccess = addAccess; window.removeAccess = removeAccess;
 window.downloadExcel = downloadExcel; window.exportCSV = exportCSV; window.downloadAck = downloadAck;
 window.printReport = printReport; window.S = S; window.DNAMES = DNAMES; window.render = render;
+window.getAdminDistricts = getAdminDistricts;
 async function init() {
   await loadAppData({ role: 'Public' });
 
