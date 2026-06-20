@@ -556,6 +556,12 @@ async function downloadExcel(dists, filename) {
       row.getCell('A').value = currentRow - 8;
       row.getCell('B').value = vNameShort;
       row.getCell('C').value = name;
+      row.getCell('V').value = vNameShort;
+      row.getCell('W').value = name;
+      row.getCell('CK').value = vNameShort;
+      row.getCell('CL').value = name;
+      row.getCell('DH').value = vNameShort;
+      row.getCell('DI').value = name;
       currentRow++;
     });
 
@@ -565,6 +571,9 @@ async function downloadExcel(dists, filename) {
       row.getCell('A').value = null;
       row.getCell('B').value = null;
       row.getCell('C').value = null;
+      row.getCell('W').value = null;
+      row.getCell('CL').value = null;
+      row.getCell('DI').value = null;
       ALLCOLS.forEach(col => {
         row.getCell(col).value = null;
       });
@@ -575,6 +584,12 @@ async function downloadExcel(dists, filename) {
     r8.getCell('B').value = vNameShort;
     r8.getCell('C').value = dists.length;
     r7.getCell('C').value = dists.length;
+    r8.getCell('V').value = vNameShort;
+    r8.getCell('W').value = dists.length;
+    r8.getCell('CK').value = vNameShort;
+    r8.getCell('CL').value = dists.length;
+    r8.getCell('DH').value = vNameShort;
+    r8.getCell('DI').value = dists.length;
 
     ALLCOLS.forEach(col => {
       if (vibhagTotals[col] !== undefined) {
